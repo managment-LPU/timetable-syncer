@@ -8,11 +8,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import TimeSlotSelector from "./TimeSlotSelector";
-import TimetableImageUploader from "./TimetableImageUploader";
 import { Student, TimeSlot } from "@/models/types";
 import { addStudent } from "@/services/studentService";
 import { v4 as uuidv4 } from "uuid";
-import { analyzeTimetableImage } from "@/services/geminiService";
 
 const StudentRegistrationForm: React.FC = () => {
   const navigate = useNavigate();
@@ -26,7 +24,6 @@ const StudentRegistrationForm: React.FC = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(
     days.map(day => ({ day, slots: [] }))
   );
-  const [timetableImages, setTimetableImages] = useState<{[key: string]: string}>({});
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState(days[0]);
@@ -35,38 +32,6 @@ const StudentRegistrationForm: React.FC = () => {
     setTimeSlots(current => 
       current.map(item => item.day === day ? { ...item, slots } : item)
     );
-  };
-
-  const handleImageUpload = (day: string, imageUrl: string) => {
-    setTimetableImages(current => ({ ...current, [day]: imageUrl }));
-
-    // Use Gemini Vision API to analyze the timetable image (in a real app with Supabase)
-    // For this demo, we'll comment out the actual API call to avoid using the API unnecessarily
-    toast({
-      title: "Image Uploaded",
-      description: "The image is being analyzed for free time slots.",
-    });
-
-    // In a real app, we would uncomment and use this:
-    /*
-    analyzeTimetableImage(imageUrl, day).then(slots => {
-      if (slots.length > 0) {
-        handleTimeSlotChange(day, slots);
-        toast({
-          title: "Image Analysis Complete",
-          description: `Found ${slots.length} free time slots for ${day}`,
-        });
-      }
-    });
-    */
-  };
-
-  const handleImageRemove = (day: string) => {
-    setTimetableImages(current => {
-      const newImages = { ...current };
-      delete newImages[day];
-      return newImages;
-    });
   };
 
   const validateForm = (): boolean => {
@@ -126,15 +91,14 @@ const StudentRegistrationForm: React.FC = () => {
         name,
         regNo,
         rollNo,
-        timeSlots,
-        timetableImages
+        timeSlots
       };
 
       addStudent(newStudent);
 
       toast({
         title: "Registration Successful",
-        description: "Your timetable information has been submitted successfully."
+        description: "Your free time slots have been submitted successfully."
       });
 
       // Reset form
@@ -142,7 +106,6 @@ const StudentRegistrationForm: React.FC = () => {
       setRegNo("");
       setRollNo("");
       setTimeSlots(days.map(day => ({ day, slots: [] })));
-      setTimetableImages({});
       
       // Navigate to success page or home page
       navigate("/");
@@ -218,15 +181,6 @@ const StudentRegistrationForm: React.FC = () => {
                     selectedSlots={timeSlots.find(d => d.day === day)?.slots || []}
                     onChange={handleTimeSlotChange}
                   />
-                  
-                  <div className="pt-4">
-                    <TimetableImageUploader
-                      day={day}
-                      imageUrl={timetableImages[day] || null}
-                      onImageUpload={handleImageUpload}
-                      onImageRemove={handleImageRemove}
-                    />
-                  </div>
                 </TabsContent>
               ))}
             </Tabs>

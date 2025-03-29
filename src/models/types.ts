@@ -10,9 +10,6 @@ export interface Student {
   regNo: string;
   rollNo: string;
   timeSlots: TimeSlot[];
-  timetableImages: {
-    [key: string]: string; // Day -> Image URL
-  };
 }
 
 export interface CommonSlot {

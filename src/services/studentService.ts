@@ -19,3 +19,24 @@ export const getStudentById = (id: string): Student | undefined => {
 export const clearStudents = (): void => {
   students.length = 0;
 };
+
+// Helper functions for data export
+export const exportStudentsToJson = (): string => {
+  return JSON.stringify(students, null, 2);
+};
+
+export const exportStudentsToCsv = (): string => {
+  // CSV header
+  let csv = "Id,Name,Registration Number,Roll Number,Day,Free Slots\n";
+  
+  // Add data rows
+  students.forEach(student => {
+    student.timeSlots.forEach(timeSlot => {
+      if (timeSlot.slots.length > 0) {
+        csv += `${student.id},${student.name},${student.regNo},${student.rollNo},${timeSlot.day},"${timeSlot.slots.join(', ')}"\n`;
+      }
+    });
+  });
+  
+  return csv;
+};

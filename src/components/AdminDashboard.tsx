@@ -5,11 +5,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import { getAllStudents } from "@/services/studentService";
 import { analyzeCommonSlots } from "@/services/geminiService";
 import { Student, CommonSlot } from "@/models/types";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 
 const AdminDashboard: React.FC = () => {
   const { toast } = useToast();
@@ -55,6 +63,68 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const exportToJson = () => {
+    if (students.length === 0) {
+      toast({
+        title: "No Data Available",
+        description: "There are no students to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const dataStr = JSON.stringify(students, null, 2);
+    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+    
+    const exportFileName = `student-timetable-data-${new Date().toISOString().split('T')[0]}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileName);
+    linkElement.click();
+    
+    toast({
+      title: "Export Successful",
+      description: `Data exported as ${exportFileName}`
+    });
+  };
+
+  const exportToCsv = () => {
+    if (students.length === 0) {
+      toast({
+        title: "No Data Available",
+        description: "There are no students to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // CSV header
+    let csvContent = "Id,Name,Registration Number,Roll Number,Day,Free Slots\n";
+    
+    // Add data rows
+    students.forEach(student => {
+      student.timeSlots.forEach(timeSlot => {
+        if (timeSlot.slots.length > 0) {
+          csvContent += `${student.id},${student.name},${student.regNo},${student.rollNo},${timeSlot.day},"${timeSlot.slots.join(', ')}"\n`;
+        }
+      });
+    });
+    
+    const dataUri = `data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}`;
+    const exportFileName = `student-timetable-data-${new Date().toISOString().split('T')[0]}.csv`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileName);
+    linkElement.click();
+    
+    toast({
+      title: "Export Successful",
+      description: `Data exported as ${exportFileName}`
+    });
+  };
+
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
   return (
@@ -66,20 +136,38 @@ const AdminDashboard: React.FC = () => {
             Manage student registration data and analyze common free time slots.
           </p>
         </div>
-        <Button 
-          onClick={handleAnalyze} 
-          disabled={isAnalyzing || students.length === 0}
-          className="bg-timetable-indigo hover:bg-timetable-purple transition-colors"
-        >
-          {isAnalyzing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            "Analyze Common Slots"
-          )}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            onClick={handleAnalyze} 
+            disabled={isAnalyzing || students.length === 0}
+            className="bg-timetable-indigo hover:bg-timetable-purple transition-colors"
+          >
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              "Analyze Common Slots"
+            )}
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={exportToJson}
+            disabled={students.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export JSON
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={exportToCsv}
+            disabled={students.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -191,13 +279,26 @@ const AdminDashboard: React.FC = () => {
                           
                           <div>
                             <h3 className="font-medium mb-2">Available Students</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {dayData.students.map(student => (
-                                <Card key={student} className="p-3">
-                                  <div className="text-sm">{student}</div>
-                                </Card>
-                              ))}
-                            </div>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Registration No.</TableHead>
+                                  <TableHead>Roll No.</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {students
+                                  .filter(student => dayData.students.includes(student.name))
+                                  .map(student => (
+                                    <TableRow key={student.id}>
+                                      <TableCell>{student.name}</TableCell>
+                                      <TableCell>{student.regNo}</TableCell>
+                                      <TableCell>{student.rollNo}</TableCell>
+                                    </TableRow>
+                                  ))}
+                              </TableBody>
+                            </Table>
                           </div>
                         </div>
                       )}
