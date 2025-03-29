@@ -13,11 +13,13 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { getAllStudents } from "@/services/studentService";
+import { getAllStudents, exportStudentsToJson, exportStudentsToCsv } from "@/services/studentService";
 import { analyzeCommonSlots } from "@/services/geminiService";
 import { Student, CommonSlot } from "@/models/types";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, ChevronDown, ChevronUp } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const AdminDashboard: React.FC = () => {
   const { toast } = useToast();
@@ -25,6 +27,8 @@ const AdminDashboard: React.FC = () => {
   const [commonSlots, setCommonSlots] = useState<CommonSlot[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [activeTab, setActiveTab] = useState("Monday");
+  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     // Load students
@@ -63,6 +67,13 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const toggleStudentExpand = (studentId: string) => {
+    setExpandedStudents(prev => ({
+      ...prev,
+      [studentId]: !prev[studentId]
+    }));
+  };
+
   const exportToJson = () => {
     if (students.length === 0) {
       toast({
@@ -73,7 +84,7 @@ const AdminDashboard: React.FC = () => {
       return;
     }
 
-    const dataStr = JSON.stringify(students, null, 2);
+    const dataStr = exportStudentsToJson();
     const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
     
     const exportFileName = `student-timetable-data-${new Date().toISOString().split('T')[0]}.json`;
@@ -99,18 +110,7 @@ const AdminDashboard: React.FC = () => {
       return;
     }
 
-    // CSV header
-    let csvContent = "Id,Name,Registration Number,Roll Number,Day,Free Slots\n";
-    
-    // Add data rows
-    students.forEach(student => {
-      student.timeSlots.forEach(timeSlot => {
-        if (timeSlot.slots.length > 0) {
-          csvContent += `${student.id},${student.name},${student.regNo},${student.rollNo},${timeSlot.day},"${timeSlot.slots.join(', ')}"\n`;
-        }
-      });
-    });
-    
+    const csvContent = exportStudentsToCsv();
     const dataUri = `data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}`;
     const exportFileName = `student-timetable-data-${new Date().toISOString().split('T')[0]}.csv`;
     
@@ -192,19 +192,43 @@ const AdminDashboard: React.FC = () => {
                       <div className="text-sm text-muted-foreground">
                         Reg No: {student.regNo} | Roll No: {student.rollNo}
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {student.timeSlots
-                          .filter(slot => slot.slots.length > 0)
-                          .slice(0, 2)
-                          .map(slot => (
-                            <Badge key={slot.day} variant="outline">
-                              {slot.day.substring(0, 3)}: {slot.slots.length} slots
-                            </Badge>
-                          ))}
-                        {student.timeSlots.filter(slot => slot.slots.length > 0).length > 2 && (
-                          <Badge variant="outline">+more</Badge>
-                        )}
-                      </div>
+                      
+                      <Collapsible open={expandedStudents[student.id]} onOpenChange={() => toggleStudentExpand(student.id)}>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {student.timeSlots
+                            .filter(slot => slot.slots.length > 0)
+                            .slice(0, expandedStudents[student.id] ? undefined : 2)
+                            .map(slot => (
+                              <Badge key={slot.day} variant="outline">
+                                {slot.day.substring(0, 3)}: {slot.slots.length} slots
+                              </Badge>
+                            ))}
+                          
+                          {student.timeSlots.filter(slot => slot.slots.length > 0).length > 2 && !expandedStudents[student.id] && (
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="p-0 h-6">
+                                <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+                                  +more <ChevronDown className="h-3 w-3 ml-1" />
+                                </Badge>
+                              </Button>
+                            </CollapsibleTrigger>
+                          )}
+                        </div>
+                        
+                        <CollapsibleContent>
+                          {student.timeSlots.filter(slot => slot.slots.length > 0).length > 0 && (
+                            <div className="mt-2">
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="p-0 h-6">
+                                  <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+                                    Show less <ChevronUp className="h-3 w-3 ml-1" />
+                                  </Badge>
+                                </Button>
+                              </CollapsibleTrigger>
+                            </div>
+                          )}
+                        </CollapsibleContent>
+                      </Collapsible>
                     </Card>
                   ))}
                 </div>
@@ -248,7 +272,7 @@ const AdminDashboard: React.FC = () => {
                 <TabsList className="grid grid-cols-3 md:grid-cols-6 w-full">
                   {days.map(day => (
                     <TabsTrigger key={day} value={day}>
-                      {day.substring(0, 3)}
+                      {isMobile ? day.substring(0, 3) : day}
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -284,7 +308,7 @@ const AdminDashboard: React.FC = () => {
                                 <TableRow>
                                   <TableHead>Name</TableHead>
                                   <TableHead>Registration No.</TableHead>
-                                  <TableHead>Roll No.</TableHead>
+                                  <TableHead className="hidden sm:table-cell">Roll No.</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -294,7 +318,7 @@ const AdminDashboard: React.FC = () => {
                                     <TableRow key={student.id}>
                                       <TableCell>{student.name}</TableCell>
                                       <TableCell>{student.regNo}</TableCell>
-                                      <TableCell>{student.rollNo}</TableCell>
+                                      <TableCell className="hidden sm:table-cell">{student.rollNo}</TableCell>
                                     </TableRow>
                                   ))}
                               </TableBody>
